@@ -1,7 +1,7 @@
 export const chapters=[
- {name:'Sunrise terrace',source:[-9,-2],goal:[-3,-10],mirrors:[[-3,-2]],initial:[1],color:0x33cbf0,story:'THE SUNBIRD WAKES!'},
- {name:'Copper orchard',source:[-9,1],goal:[7,-7],mirrors:[[-5,1],[-5,-7]],initial:[1,1],color:0x5acff2,story:'THE ORCHARD LIGHTS UP!'},
- {name:'Starfall forge',source:[-9,2],goal:[4,-12],mirrors:[[-6,2],[-6,-5],[4,-5]],initial:[1,1,1],color:0x5f77db,story:'THE SKY BRIDGE RETURNS!'}
+ {name:'Sunrise terrace',ore:[[-1,2],[6,-2]],source:[-9,-2],goal:[-3,-10],mirrors:[[-3,-2]],initial:[1],color:0x33cbf0,story:'THE SUNBIRD WAKES!'},
+ {name:'Copper orchard',ore:[[0,2],[6,-5]],source:[-9,1],goal:[7,-7],mirrors:[[-5,1],[-5,-7]],initial:[1,1],color:0x5acff2,story:'THE ORCHARD LIGHTS UP!'},
+ {name:'Starfall forge',ore:[[-1,3],[8,-4]],source:[-9,2],goal:[4,-12],mirrors:[[-6,2],[-6,-5],[4,-5]],initial:[1,1,1],color:0x5f77db,story:'THE SKY BRIDGE RETURNS!'}
 ];
 const vectors=[[1,0],[0,1],[-1,0],[0,-1]];
 export function beam(chapter,angles){

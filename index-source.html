@@ -1,7 +1,7 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Skyforge Signals</title><link rel="stylesheet" href="style.css"></head>
 <body><main><canvas aria-label="Floating island and mirror puzzle"></canvas>
-<header><div><small>THE FLOATING KINGDOM</small><h1>SKYFORGE</h1></div><button id="sound" aria-label="Toggle music">♫</button></header>
+<header><div><small>THE FLOATING KINGDOM</small><h1>SKYFORGE</h1></div><div class="tools"><div class="crystal"><i></i><b id="ore-count">0 / 6</b></div><button id="sound" aria-label="Toggle music">♫</button></div></header>
 <div id="hud" hidden><small id="chapter"></small><strong id="task">Route light to the beacon</strong></div>
-<div id="caption" role="status"></div><div id="stick" hidden><b></b></div><button id="rotate" hidden>↻<span>TURN</span></button>
-<section id="panel"><small>THREE ISLANDS · ONE LOST SUNBIRD</small><h2 id="title">Follow the light.</h2><p id="desc">Drag to move. Walk up to a mirror and turn it to guide the beam into the beacon.</p><button id="go">ENTER THE SKYFORGE →</button></section></main>
+<div id="caption" role="status"></div><div id="stick" hidden><b></b></div><button id="rotate" hidden><b id="action-icon">↻</b><span id="action-label">TURN</span></button>
+<section id="panel"><small>THREE ISLANDS · ONE LOST SUNBIRD</small><h2 id="title">Follow the light.</h2><p id="desc">Drag to move. Walk up to a mirror and turn it to guide the beam into the beacon. Mine crystal blocks along the way.</p><button id="go">ENTER THE SKYFORGE →</button></section></main>
 <script src="vendor/three.min.js"></script><script type="module" src="game.mjs"></script></body></html>

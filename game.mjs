@@ -3,20 +3,26 @@ import {World} from './view.mjs';
 import {Music} from './audio.mjs';
 import {BeaconHost} from './sdk.mjs';
 const $=s=>document.querySelector(s),canvas=$('canvas'),music=new Music();
-const key='skyforge-signals-save-v1', fresh=()=>({game:'skyforge-signals',v:1,cleared:0,gold:false,confetti:false});
+const key='skyforge-signals-save-v1', fresh=()=>({game:'skyforge-signals',v:1,cleared:0,gold:false,confetti:false,ore:[0,0,0]});
 let save=fresh(),world;
-function merge(v){if(v?.game!==save.game||v.v!==1)return;save.cleared=Math.max(save.cleared,Number.isInteger(v.cleared)?Math.min(3,v.cleared):0);for(const k of ['gold','confetti'])save[k]||=v[k]===true}
+function merge(v){if(v?.game!==save.game||v.v!==1)return;save.cleared=Math.max(save.cleared,Number.isInteger(v.cleared)?Math.min(3,v.cleared):0);for(const k of ['gold','confetti'])save[k]||=v[k]===true;for(let n=0;n<3;n++)if(Number.isInteger(v.ore?.[n]))save.ore[n]|=v.ore[n]&3}
 try{merge(JSON.parse(localStorage.getItem(key)))}catch{}
 function store(){try{localStorage.setItem(key,JSON.stringify(save))}catch{}host.save(save)}
 const host=new BeaconHost(window,{load(v){merge(v);store();if(phase==='menu')menuText()},reward(k){if(save[k])return;save[k]=true;store();announce(k==='gold'?'GOLD BADGE UNLOCKED!':'STAR BADGE UNLOCKED!',2)}});
-let i=0,chapter=chapters[0],angles=[...chapter.initial],x=-3,z=2.5,heading=0,near=-1,phase='menu',sceneTime=0,ttl=0,pointer=null,dx=0,dz=0;
+let i=0,chapter=chapters[0],angles=[...chapter.initial],x=-3,z=2.5,heading=0,near=-1,oreNear=-1,phase='menu',sceneTime=0,ttl=0,pointer=null,dx=0,dz=0;
 const keys=new Set();
 function announce(s,t=0){$('#caption').textContent=s;ttl=t}
-function menuText(){if(save.cleared>0)$('#go').textContent=save.cleared===3?'REPLAY THE ISLANDS →':'CONTINUE →'}
+function updateOre(){const n=save.ore.reduce((a,b)=>a+(b&1)+((b>>1)&1),0);const el=$("#ore-count");el.textContent=n+" / 6";el.setAttribute?.("aria-label","Crystals collected: "+n+" out of 6")}
+function menuText(){updateOre();if(save.cleared>0)$('#go').textContent=save.cleared===3?'REPLAY THE ISLANDS →':'CONTINUE →'}
 function resetInput(){keys.clear();pointer=null;dx=dz=0;$('#stick').hidden=true}
-function enter(n){i=n;chapter=chapters[i];angles=[...chapter.initial];x=chapter.mirrors[0][0];z=4;near=-1;heading=0;sceneTime=0;phase='intro';resetInput();world.layout(chapter);world.setBeam(beam(chapter,angles));$('#panel').hidden=true;$('#hud').hidden=true;$('#rotate').hidden=true;announce(chapter.name.toUpperCase());music.start()}
+function enter(n){i=n;chapter=chapters[i];angles=[...chapter.initial];x=chapter.mirrors[0][0];z=4;near=-1;oreNear=-1;heading=0;sceneTime=0;phase='intro';resetInput();world.layout(chapter);world.setBeam(beam(chapter,angles));$('#panel').hidden=true;$('#hud').hidden=true;$('#rotate').hidden=true;announce(chapter.name.toUpperCase());music.start()}
 function play(){phase='play';sceneTime=0;announce('');$('#hud').hidden=false;$('#chapter').textContent='ISLAND '+(i+1)+' / '+chapters.length+'  ·  '+chapter.name.toUpperCase();host.start()}
-function rotate(){if(phase!=='play'||near<0)return;angles[near]^=1;const result=beam(chapter,angles);world.setBeam(result);music.hit(result.lit?6:near+1);if(!result.lit){announce('BEAM REDIRECTED',.65);return}phase='celebrate';sceneTime=0;resetInput();$('#rotate').hidden=true;$('#hud').hidden=true;host.end();save.cleared=Math.max(save.cleared,i+1);store();announce(chapter.story)}
+function rotate(){if(phase!=='play')return;
+ if(near<0&&oreNear>=0&&!(save.ore[i]&(1<<oreNear))){
+  save.ore[i]|=1<<oreNear;world.mine(oreNear);oreNear=-1;store();updateOre();music.hit(4);
+  announce(save.ore.every(n=>n===3)?'CRYSTAL COLLECTION COMPLETE!':'+1 SKY CRYSTAL',1.2);return;
+ }
+ if(near<0)return;angles[near]^=1;const result=beam(chapter,angles);world.setBeam(result);music.hit(result.lit?6:near+1);if(!result.lit){announce('BEAM REDIRECTED',.65);return}phase='celebrate';sceneTime=0;resetInput();$('#rotate').hidden=true;$('#hud').hidden=true;host.end();save.cleared=Math.max(save.cleared,i+1);store();announce(chapter.story)}
 function finish(){phase='result';announce('');$('#panel').hidden=false;$('#title').textContent=i===2?'Skyforge restored!':'Beacon lit!';$('#desc').textContent=i===2?'The sunbird is home. The islands shine again.':'The next island is open. Follow the beam to find your next mirror.';$('#go').textContent=i===2?'PLAY AGAIN ↻':'NEXT ISLAND →'}
 $('#go').onclick=()=>{if(world)enter(phase==='menu'?(save.cleared%3):(i+1)%3)};
 $('#sound').onclick=()=>{music.toggle();$('#sound').textContent=music.enabled?'♫':'♪̸';$('#sound').setAttribute('aria-pressed',String(music.enabled))};
@@ -36,11 +42,14 @@ function frame(ms){const time=ms/1000,dt=Math.min(.035,time-last);last=time;scen
  if(phase==='play'){
   let vx=dx+Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft')),vz=dz+Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));
   const d=Math.max(1,Math.hypot(vx,vz));vx/=d;vz/=d;moving=Math.hypot(vx,vz)>.08;
-  if(moving){const a=Math.max(-10.5,Math.min(10.5,x+vx*dt*5.8)),b=Math.max(-13.3,Math.min(5.3,z+vz*dt*5.8));const obstacles=[chapter.source,...chapter.mirrors,chapter.goal];if(obstacles.every(([mx,mz])=>Math.hypot(mx-a,mz-z)>.79))x=a;if(obstacles.every(([mx,mz])=>Math.hypot(mx-x,mz-b)>.79))z=b;heading=-Math.atan2(vx,-vz)}
+  if(moving){const a=Math.max(-10.5,Math.min(10.5,x+vx*dt*5.8)),b=Math.max(-13.3,Math.min(5.3,z+vz*dt*5.8));const obstacles=[chapter.source,...chapter.mirrors,chapter.goal,...chapter.ore.filter((_,j)=>!(save.ore[i]&(1<<j)))];if(obstacles.every(([mx,mz])=>Math.hypot(mx-a,mz-z)>.79))x=a;if(obstacles.every(([mx,mz])=>Math.hypot(mx-x,mz-b)>.79))z=b;heading=-Math.atan2(vx,-vz)}
   const distances=chapter.mirrors.map(([a,b])=>Math.hypot(a-x,b-z));const closest=Math.min(...distances);near=closest<2.25?distances.indexOf(closest):-1;
-  $('#rotate').hidden=near<0;const task=near>=0?'Turn the mirror to bend the beam':(i===0?'Drag to move · walk to the mirror':'Follow the beam · find the next mirror');if($('#task').textContent!==task)$('#task').textContent=task;
+  oreNear=chapter.ore.findIndex(([a,b],j)=>!(save.ore[i]&(1<<j))&&Math.hypot(a-x,b-z)<1.8);
+  const label=near>=0?'TURN':'MINE';
+  const icon=near>=0?'↻':'⛏';$('#action-label').textContent=label;$('#action-icon').textContent=icon;
+  $('#rotate').hidden=near<0&&oreNear<0;const task=near>=0?'Turn the mirror to bend the beam':oreNear>=0?'Mine the crystal block':(i===0?'Drag to move · walk to the mirror':'Follow the beam · find the next mirror');if($('#task').textContent!==task)$('#task').textContent=task;
  }
- world.draw({x,z,heading,moving,angles,near,phase,chapter,sceneTime},time,dt);
+ world.draw({x,z,heading,moving,angles,near,phase,chapter,sceneTime,mined:save.ore[i],oreNear},time,dt);
  requestAnimationFrame(frame);
 }
 if(world)requestAnimationFrame(frame);

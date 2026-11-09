@@ -7,8 +7,8 @@ export class World{
   this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFSoftShadowMap;
   this.scene=new T.Scene();this.scene.background=new T.Color(0x52c3f3);this.scene.fog=new T.FogExp2(0xaacff4,.013);
   this.camera=new T.PerspectiveCamera(53,1,.1,155);
-  this.scene.add(new T.HemisphereLight(0xe9f5ff,0x62519e,.92));
-  const sun=new T.DirectionalLight(0xffe6a5,1.55);sun.position.set(-9,18,8);sun.castShadow=true;
+  this.scene.add(new T.HemisphereLight(0xe9f5ff,0x6e7452,.93));
+  const sun=new T.DirectionalLight(0xffeac5,1.45);sun.position.set(-9,18,8);sun.castShadow=true;
   sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-20,right:20,top:20,bottom:-20,near:.1,far:65});sun.shadow.bias=-.0003;sun.shadow.normalBias=.025;
   this.scene.add(sun);
   this.geo=new T.BoxGeometry();this.palette=new Map();
@@ -17,6 +17,17 @@ export class World{
   this.grass=this.pixel('#67b63a',['#80c84e','#5baa34','#91ce4c','#4c963d']);
   this.wood=this.pixel('#956047',['#aa7458','#754839','#bc8861'],true);
   this.leaf=this.pixel('#e983a8',['#e3649b','#f3a6c0','#f4b0d1','#ba5089']);
+  this.dirt=this.pixel('#7d5435',['#8e5e3a','#67422a','#9f7049','#524534']);
+  this.rock=this.pixel('#797e83',['#6b7076','#9b9b8d','#8a8b83','#555f69']);
+  this.leaf=this.pixel('#39752a',['#275221','#4a8b31','#539d34','#376731']);
+  this.grass=this.pixel('#649936',['#77a63c','#699b36','#84ad46','#54862c']);
+  this.oreTexture=this.pixel('#616968',['#74766e','#454e53','#828275','#4cf7db','#42b9aa']);
+  this.grassSide=this.grass.map.image.cloneNode();this.grassSide.width=32;this.grassSide.height=32;
+  const edge=this.grassSide.getContext('2d');edge.drawImage(this.dirt.map.image,0,0);edge.drawImage(this.grass.map.image,0,0,32,8,0,0,32,8);
+  for(let n=0;n<16;n++)edge.drawImage(this.grass.map.image,n*2,8,2,5+n%3, n*2,8,2,3+n%5);
+  const sideMap=new T.CanvasTexture(this.grassSide);sideMap.encoding=T.sRGBEncoding;sideMap.magFilter=T.NearestFilter;sideMap.minFilter=T.NearestMipmapLinearFilter;
+  const side=new T.MeshStandardMaterial({map:sideMap,roughness:1});
+  this.sod=[side,side,this.grass,this.dirt,side,side];
   this.buildIsland();
   this.setpieces=new T.Group();this.scene.add(this.setpieces);
   this.rays=new T.Group();this.scene.add(this.rays);
@@ -49,23 +60,31 @@ export class World{
  box(w,h,d,c,x,y,z,parent=this.scene,cast=false){
   const m=new T.Mesh(this.geo,this.material(c));m.position.set(x,y,z);m.scale.set(w,h,d);m.castShadow=cast;m.receiveShadow=true;parent.add(m);return m;
  }
- batch(c,cells){
+ batch(c,cells,cast=false){
   const mesh=new T.InstancedMesh(this.geo,this.material(c),cells.length),proxy=new T.Object3D();
   cells.forEach(([x,y,z,w,h,d],i)=>{proxy.position.set(x,y,z);proxy.scale.set(w,h,d);proxy.updateMatrix();mesh.setMatrixAt(i,proxy.matrix)});
-  mesh.receiveShadow=true;this.scene.add(mesh);return mesh;
+  mesh.castShadow=cast;mesh.receiveShadow=true;this.scene.add(mesh);return mesh;
  }
  buildIsland(){
-  const tiles=[],grass=[],strata=[];
+  const tiles=[],grass=[],strata=[],rocks=[];
   for(let x=-13;x<=13;x++)for(let z=-17;z<=8;z++){
-   const road=x>=-10&&x<=10&&z>=-13&&z<=5;
-   (road?tiles:grass).push([x,-.22,z,.985,.44,.985]);
-   if(Math.abs(x)===13||z===-17||z===8)strata.push([x,-1.1-(Math.abs(x+z)%3)*.2,z,1,1.5+(Math.abs(x+z)%3)*.4,1]);
+   if(Math.abs(x)>11&&(z===8||z===-17))continue;
+   const road=(x===-3&&z>-13)||(x>-10&&x<9&&(z===1||z===-7))||((x+1)**2+(z+3)**2<10&&((x+z)&3)!==0);
+   (road?tiles:grass).push([x,-.5,z,1,1,1]);
+   if(Math.abs(x)>=12||z<=-16||z>=7){
+    strata.push([x,-1.5,z,1,1,1]);rocks.push([x,-2.5,z,1,1,1]);
+    if((x*x+z*z)%5>1)rocks.push([x,-3.5,z,1,1,1]);
+   }
+   if((Math.abs(x)>=12||z<=-15)&&((x*13+z*7)&3)!==0)grass.push([x,.5,z,1,1,1]);
+   if((Math.abs(x)>=13||z<=-16)&&((x+z)&1)===0)grass.push([x,1.5,z,1,1,1]);
   }
-  this.batch(this.stone,tiles);this.batch(this.grass,grass);this.batch(this.brick,strata);
-  for(let i=0;i<4;i++)this.box(26-i*4,1,25-i*3.6,this.brick,0,-.95-i,-4.5);
+  this.batch(this.stone,tiles);this.batch(this.sod,grass);this.batch(this.dirt,strata);this.batch(this.rock,rocks);
+  for(let i=0;i<4;i++)this.box(24-i*4,1,23-i*3.6,this.rock,0,-2.5-i,-4.5);
+  this.water=[];
+  for(let j=0;j<12;j++)this.water.push(this.box(.89,1.03,.85,[0x33b8f3,0x65e0ff,0x286ed7][j%3],11.6,-.1-j*.72,7.65+j*.10));
   for(const side of [-1,1]){
    for(let i=0;i<7;i++){
-    const z=5-i*3.3,x=side*10.85;
+    const z=5-i*3.3,x=side*11.35;
     this.box(.53,.92,.53,this.stone,x,.46,z,undefined,true);
     this.box(.61,.11,.61,0xffc858,x,.98,z);
     this.box(.45,.43,.45,new T.MeshBasicMaterial({color:0xffedb0}),x,1.23,z);
@@ -73,11 +92,44 @@ export class World{
     if(i<6)this.box(.21,.23,2.8,this.stone,x,.53,z-1.65);
    }
   }
-  for(const [x,z] of [[-12,3],[12,1],[-12,-7],[12,-8],[-12,-14],[12,-15],[-7,-16],[7,-16]]){
-   this.box(.60,3,.60,this.wood,x,1.5,z,undefined,true);
-   for(let j=0;j<9;j++){
-    this.box(1.12+j%2*.23,1.05,1.12,this.leaf,x+(j%3-1)*.79,3.25+Math.floor(j/3)*.46,z+Math.sin(j*4)*.55,undefined,true);
+  const crowns=[],trunks=[];
+  for(const [x,z,h] of [[-12,3,4],[12,1,5],[-12,-7,5],[12,-8,4],[-12,-14,5],[12,-15,5],[-9,-15,4],[7,-16,5],[-12,7,4],[12,6,5]]){
+   for(let j=0;j<h;j++)trunks.push([x,.5+j,z,.88,1,.88]);
+   for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)for(let j=0;j<3;j++){
+    if(j===2&&Math.abs(a)+Math.abs(b)>1)continue;
+    crowns.push([x+a,h-.5+j,z+b,1,1,1]);
    }
+  }
+  this.batch(this.leaf,crowns,true);this.batch(this.wood,trunks,true);
+  // The watch hut occupies the back ridge, outside the playable path.
+  const hut=this.group(this.scene,-6,0,-16.7);
+  const plank=this.pixel('#b78953',['#c4945b','#a67846','#8c6240'],true);
+  const roof=this.pixel('#984b3d',['#bb5e41','#8a3f38','#a85341'],true);
+  this.box(4.7,.85,3.4,this.rock,0,.42,0,hut,true);
+  this.box(4.4,2.5,3.2,plank,0,2.08,0,hut,true);
+  for(const a of [-1,1]){
+   this.box(.4,2.65,.47,this.wood,a*2.1,2.04,1.58,hut,true);
+   this.box(.79,.79,.10,0x69472f,a*1.25,2.29,1.62,hut);
+   this.box(.59,.60,.11,0xffd976,a*1.25,2.29,1.69,hut);
+   this.box(.09,.62,.14,0x805338,a*1.25,2.29,1.73,hut);
+  }
+  this.box(.86,1.78,.13,this.wood,0,1.65,1.62,hut);
+  this.box(.12,.12,.13,0xf2bd65,.23,1.60,1.72,hut);
+  for(let j=0;j<4;j++)this.box(5.2-j*1.1,.46,4.0,roof,0,3.45+j*.44,0,hut,true);
+  this.box(.59,1.17,.61,this.rock,1.5,4.20,-.70,hut,true);
+  const pond=this.group(this.scene,5.7,0,-12);
+  for(let a=-2;a<=2;a++)for(let b=-1;b<=1;b++){
+   if(Math.abs(a)===2&&Math.abs(b)===1)continue;
+   this.box(1,.075,1,((a+b)&1)?0x3aa6d9:0x43b9e6,a,.022,b,pond);
+   if(((a*3+b)&3)===0)this.box(.46,.026,.10,0xa5e8ea,a,.066,b+.27,pond);
+  }
+  this.sheep=this.group(this.scene,8,0,-2);
+  this.box(1.04,.87,1.33,this.pixel('#e6e4d8',['#f3f0dd','#dad9c9','#c8c8bb']),0,.82,0,this.sheep,true);
+  this.box(.62,.62,.58,0xf7efdb,0,1.01,-.79,this.sheep,true);
+  this.box(.47,.32,.07,0xe9b4a2,0,.94,-1.10,this.sheep);
+  for(const a of [-1,1]){
+   this.box(.08,.08,.07,0x322520,a*.14,1.09,-1.10,this.sheep);
+   for(const b of [-1,1])this.box(.22,.46,.23,0xb99c82,a*.32,.23,b*.40,this.sheep,true);
   }
   const blooms=[];
   for(let i=0;i<66;i++){
@@ -101,7 +153,7 @@ export class World{
  }
  makeHero(){
   const p=this.hero;
-  this.box(.64,.72,.44,0x3359a0,0,1.13,0,p,true);
+  this.box(.64,.72,.44,0x258a83,0,1.13,0,p,true);
   this.box(.53,.52,.50,0xf0aa7d,0,1.78,-.03,p,true);
   this.box(.59,.18,.56,0x37283e,0,2.05,-.025,p,true);
   this.box(.61,.12,.64,0xee9b40,0,2.16,-.035,p,true);
@@ -111,11 +163,15 @@ export class World{
   this.box(.54,.58,.29,0xc36738,0,1.17,.34,p,true);
   this.box(.44,.17,.05,0xffd461,0,1.28,.51,p);
   this.limbs=[];
+  this.tool=this.group(p,.48,1.06,-.34);this.tool.rotation.z=-.38;
+  this.box(.11,.66,.11,this.wood,0,0,0,this.tool,true);
+  for(let n=-2;n<=2;n++)this.box(.12,.15,.13,0x8ed8cf,n*.12,.32-Math.abs(n)*.09,0,this.tool,true);
+  this.chips=[];
   for(const side of [-1,1]){
    const leg=this.group(p,side*.17,.76,0),arm=this.group(p,side*.43,1.43,0);
-   this.box(.25,.55,.29,0x264269,0,-.24,0,leg,true);
+   this.box(.25,.55,.29,0x324477,0,-.24,0,leg,true);
    this.box(.29,.18,.45,0x49354c,0,-.65,-.065,leg,true);
-   this.box(.20,.43,.23,0x457ec9,0,-.18,0,arm,true);
+   this.box(.20,.43,.23,0x299c91,0,-.18,0,arm,true);
    this.box(.20,.20,.22,0xf0aa7d,0,-.44,0,arm,true);
    this.limbs.push({leg,arm,side});
   }
@@ -135,6 +191,7 @@ export class World{
  layout(chapter){
   this.setpieces.clear();
   this.finale=[];
+  this.ore=chapter.ore.map(([x,z])=>this.box(.96,.96,.96,this.oreTexture,x,.48,z,this.setpieces,true));
   const decoration=this.group(this.setpieces);
   const kind=chapter.mirrors.length;
   for(const side of [-1,1]){
@@ -188,7 +245,24 @@ export class World{
   }
   this.beacon.material=path.lit?this.rayCore:this.material(0x8f69be);
  }
- draw({x,z,heading,moving,angles,near,phase,chapter,sceneTime},time,dt){
+ mine(i){
+  const o=this.ore[i];if(!o?.visible)return;
+  o.visible=false;this.swing=.29;
+  for(let k=0;k<12;k++){
+   const m=this.box(.12,.12,.12,k%2?0x43d9c1:0x8a8a81,o.position.x,.56,o.position.z);
+   this.chips.push({m,x:o.position.x,z:o.position.z,a:k*2.4,t:0});
+  }
+ }
+ draw({x,z,heading,moving,angles,near,phase,chapter,sceneTime,mined,oreNear},time,dt){
+  this.swing=Math.max(0,(this.swing||0)-dt);
+  this.tool.rotation.x=-Math.sin(this.swing/.29*Math.PI)*1.7;
+  this.ore.forEach((o,i)=>{o.visible=!(mined&(1<<i));const pulse=i===oreNear?1+Math.sin(time*8)*.055:1;o.scale.setScalar(.96*pulse)});
+  this.chips=this.chips.filter(p=>{p.t+=dt;if(p.t>.58){p.m.removeFromParent();return false}
+   p.m.position.set(p.x+Math.cos(p.a)*p.t*2,.5+3*p.t-5*p.t*p.t,p.z+Math.sin(p.a)*p.t*2);p.m.rotation.set(p.t*8,p.a+p.t*4,0);return true;});
+  this.sheep.position.set(8.1+Math.sin(time*.7)*.65,0,-2+Math.cos(time*.38)*1.3);
+  this.sheep.rotation.y=Math.sin(time*.53)*1.1;
+  this.water.forEach((p,i)=>{p.position.x=11.6+Math.sin(time*4+i)*.10;p.scale.x=.84+.09*Math.sin(time*7-i)});
+
   this.hero.position.set(x,0,z);this.hero.rotation.y=heading;
   for(const {arm,leg,side} of this.limbs){
    const swing=moving?Math.sin(time*13)*.52*side:0;
@@ -216,7 +290,7 @@ export class World{
    if(m.visible){const age=(sceneTime*.7+i*.061)%1;m.position.set(gx+Math.sin(i*2.4)*age*3,1.7+age*3,gz+Math.cos(i*2.4)*age*3);m.rotation.set(time+i,time*2,0)}
   });
   if(phase==='menu'){
-   this.camera.position.set(13,11,16);this.camera.lookAt(-1,0,-3);
+   this.camera.position.set(6.7,8.2,14.6);this.camera.lookAt(-2.8,1.45,-4.6);
   }else if(story){
    this.camera.position.set(gx+4.7*Math.cos(sceneTime*.45),4.1+sceneTime*.18,gz+6.4);
    this.camera.lookAt(gx,2.1,gz-(phase==='celebrate'&&chapter.mirrors.length===3?Math.min(5,sceneTime*2.3):0));
@@ -230,4 +304,5 @@ export class World{
   this.renderer.render(this.scene,this.camera);
  }
 }
+
 
